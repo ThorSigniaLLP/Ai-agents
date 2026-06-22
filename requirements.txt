@@ -1,0 +1,53 @@
+# ─── Web Framework ───────────────────────────────────────────────────────────
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+
+# ─── LangGraph / LangChain ───────────────────────────────────────────────────
+langgraph>=0.2.0
+langchain-core>=0.3.0
+langchain-groq>=0.2.0
+langchain-openai>=0.2.0
+
+# ─── LLM Providers ───────────────────────────────────────────────────────────
+groq>=0.11.0
+litellm>=1.50.0
+openai>=1.50.0
+
+# ─── Search Providers ────────────────────────────────────────────────────────
+ddgs>=9.0.0               # DuckDuckGo Search (renamed from duckduckgo-search)
+
+# ─── Content Fetching (Level 1 → Level 2) ────────────────────────────────────
+httpx>=0.27.0
+trafilatura>=1.12.0
+readability-lxml>=0.8.1
+lxml>=5.0.0
+lxml_html_clean>=0.4.0
+fake-useragent>=1.5.0
+
+# ─── Content Parsing ─────────────────────────────────────────────────────────
+beautifulsoup4>=4.12.0
+markdownify>=0.13.0
+
+# ─── Browser Fallback (Level 2 + Level 3) ────────────────────────────────────
+browser-use[core]>=0.1.0
+playwright>=1.48.0
+
+# ─── Data / Validation ───────────────────────────────────────────────────────
+pydantic>=2.9.0
+pydantic-settings>=2.5.0
+python-dateutil>=2.9.0
+sentence-transformers>=3.0.0
+
+# ─── Database ────────────────────────────────────────────────────────────────
+tortoise-orm>=0.21.0
+fastapi-admin>=1.0.4
+asyncpg>=0.29.0
+
+# ─── Async / Utilities ───────────────────────────────────────────────────────
+aiohttp>=3.10.0
+anyio>=4.6.0
+python-dotenv>=1.0.0
+tenacity>=9.0.0
+cachetools>=5.5.0
+python-slugify>=8.0.0

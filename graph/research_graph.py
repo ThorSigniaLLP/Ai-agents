@@ -26,6 +26,7 @@ from agents.specialized_extractors import run_specialized_extractors
 from agents.specialized_workers import run_specialized_workers
 from agents.url_graph import run_url_graph_builder
 from agents.website_mapper import run_website_mapper
+from agents.business_analyst import run_business_analyst
 from core.state import ResearchState
 from core.db_tracer import trace_job_complete
 
@@ -36,6 +37,11 @@ def assemble_final_output(state: ResearchState) -> dict[str, Any]:
     """Return exactly the validated CompanyProfile and no analysis fields."""
     started = time.time()
     profile = state.get("company_profile", {})
+    
+    # Inject the deep analysis report into the profile
+    analysis = state.get("business_analysis", {})
+    if "deep_analysis_report" in analysis:
+        profile["deep_analysis_report"] = analysis["deep_analysis_report"]
     
     trace_job_complete(state.get("job_id", ""), "completed")
     
@@ -62,6 +68,7 @@ def build_research_graph(use_memory_checkpointer: bool = True):
     builder.add_node("reranker", run_reranker)
     builder.add_node("specialized_extractors", run_specialized_extractors)
     builder.add_node("profile_validator", run_profile_validator)
+    builder.add_node("business_analyst", run_business_analyst)
     builder.add_node("assemble_output", assemble_final_output)
 
     builder.add_edge(START, "planner")
@@ -75,7 +82,8 @@ def build_research_graph(use_memory_checkpointer: bool = True):
     builder.add_edge("content_cleaner", "reranker")
     builder.add_edge("reranker", "specialized_extractors")
     builder.add_edge("specialized_extractors", "profile_validator")
-    builder.add_edge("profile_validator", "assemble_output")
+    builder.add_edge("profile_validator", "business_analyst")
+    builder.add_edge("business_analyst", "assemble_output")
     builder.add_edge("assemble_output", END)
 
     if use_memory_checkpointer:
@@ -106,6 +114,7 @@ def initial_research_state(company: str, card_info: dict, job_id: str | None = N
             "linkedin_company_page": "",
             "headquarters": "UNKNOWN",
             "industry": "UNKNOWN",
+            "overview": "UNKNOWN",
             "founders": [],
             "services": [],
             "technologies": [],
@@ -145,6 +154,7 @@ def initial_research_state(company: str, card_info: dict, job_id: str | None = N
         extraction_errors=[],
         verified_facts={},
         rejected_facts=[],
+        business_analysis={},
         final_output={},
         sources_used=[],
         node_timings={},

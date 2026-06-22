@@ -24,28 +24,27 @@ from core.llm_router import completion_with_fallback
 logger = logging.getLogger(__name__)
 
 _ANALYST_PROMPT = """\
-You are a senior business intelligence analyst compiling a Comprehensive Intelligence Dossier. 
-Based ONLY on the verified company data below, produce a deep analysis of the target company's business problems.
+You are a senior B2B investigative intelligence analyst compiling a Comprehensive Intelligence Dossier. 
+Based ONLY on the raw web evidence chunks below, produce a deep, structured analysis of the target company.
 
 Company: {company}
-Verified Data:
+Verified Facts (Summary):
 {facts_summary}
 
-Produce analysis for (based ONLY on the data above — no assumptions, include [Source: URL] if applicable):
-1. Market Position: How do they stand vs competitors?
-2. Growth Trajectory: Are they growing, stable, or declining? (cite specific evidence)
-3. Key Pain Points: Use ONLY the verified inferred pain points. Do not create new pain points.
-4. Opportunities: What growth opportunities exist?
-5. Risks: What are the main competitor threats or macroeconomic headwinds?
+Raw Web Evidence:
+{chunks_text}
 
-Return ONLY valid JSON:
-{{
-  "market_position": "...",
-  "growth_trajectory": "...",
-  "key_pain_points": [],
-  "opportunities": ["...", "..."],
-  "risks": ["...", "..."]
-}}
+Produce a detailed markdown report analyzing the company's business challenges, explicitly categorizing them using these lenses:
+1. GAPS – What’s Missing (e.g., no case studies, missing website features, poor digital presence)
+2. CONSTRAINTS – What Limits Them (e.g., small team size, geographic concentration, dependency on a single vendor, lack of funding)
+3. FRICTION – What Makes Things Harder (e.g., poor email open rates, lack of pricing transparency, manual processes)
+4. PRESSURE – Stress or Urgency Signals (e.g., recent leadership changes, hiring sprees, aggressive competitor threats)
+5. INFERENCES – Hidden Problems (Logical deductions from the observed data)
+
+After the categorizations, provide a final table "Extracted Business Challenges & Pain Points" with 4 columns:
+| # | Challenge / Pain Point | Evidence (Direct Quote or Logical Inference) | Solvability Lens |
+
+Output ONLY the raw markdown report. Do not use code blocks around the entire output.
 """
 
 
@@ -74,40 +73,44 @@ def run_business_analyst(state: ResearchState) -> dict[str, Any]:
     if inferred:
         inferred_lines = "\n".join(f"  [INFERRED_PAIN_POINT] {p.get('pain_point')}" for p in inferred)
         facts_summary = f"{facts_summary}\n{inferred_lines}"
-    prompt = _ANALYST_PROMPT.format(company=company, facts_summary=facts_summary)
+    chunks = state.get("evidence_chunks", [])
+    # Grab the top 15 chunks based on rerank score
+    top_chunks = sorted(chunks, key=lambda c: c.get("rerank_score", 0), reverse=True)[:15]
+    
+    chunks_text = "\n\n".join(
+        f"[Source: {c.get('url', 'UNKNOWN')}]\n{c.get('chunk', '')[:1000]}"
+        for c in top_chunks
+    )
+    if not chunks_text:
+        chunks_text = "No raw web evidence available."
+
+    prompt = _ANALYST_PROMPT.format(
+        company=company, 
+        facts_summary=facts_summary,
+        chunks_text=chunks_text
+    )
 
     try:
         response, target = completion_with_fallback(
             messages=[{"role": "user", "content": prompt}],
             settings=settings,
             temperature=0.1,
-            timeout=45,
+            timeout=60,
         )
-        raw = response.choices[0].message.content.strip()
-        raw = re.sub(r"^```(?:json)?\s*", "", raw)
-        raw = re.sub(r"\s*```$", "", raw)
-        analysis = json.loads(raw)
-        if "pain_points" in verified_facts:
-            analysis["key_pain_points"] = verified_facts["pain_points"].get("value", [])
-        else:
-            analysis["key_pain_points"] = []
+        report = response.choices[0].message.content.strip()
+        analysis = {"deep_analysis_report": report}
     except Exception as e:
         logger.warning(f"[BusinessAnalyst] Failed: {e} — using fallback")
-        analysis = {
-            "market_position": "Unable to determine — insufficient data",
-            "growth_trajectory": "Unable to determine — insufficient data",
-            "key_pain_points": verified_facts.get("pain_points", {}).get("value", []),
-            "opportunities": [],
-            "risks": [],
-        }
+        analysis = {"deep_analysis_report": "Unable to generate deep analysis report due to an error or timeout."}
 
     elapsed = round(time.time() - t0, 2)
-    logger.info(f"[BusinessAnalyst] Analysis completed for {company} in {elapsed}s")
+    logger.info(f"[BusinessAnalyst] Deep Analysis completed for {company} in {elapsed}s")
 
     return {
         "business_analysis": analysis,
         "status": "analysis_done",
         "progress_pct": 82,
         "node_timings": {"business_analyst": elapsed},
-        "log": [f"[BusinessAnalyst] Business intelligence analysis completed for {company}"],
+        "log": [f"[BusinessAnalyst] Deep Business intelligence analysis completed for {company}"],
+
     }

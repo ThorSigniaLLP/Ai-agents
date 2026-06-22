@@ -67,6 +67,7 @@ class CompanyProfile(TypedDict):
     linkedin_company_page: str
     headquarters: str
     industry: str
+    overview: NotRequired[str]
     founders: list[str]
     services: list[str]
     technologies: list[str]
@@ -81,6 +82,7 @@ class CompanyProfile(TypedDict):
     disconnection_signals: NotRequired[list[str]]
     tech_stack: NotRequired[dict]               # {crm, erp, marketing_tools, development_stack, cloud_provider}
     pitch_opportunities: NotRequired[list[str]]
+    deep_analysis_report: NotRequired[str]
     country: NotRequired[str]
     aliases: NotRequired[list[str]]
 
@@ -113,6 +115,7 @@ class ResearchState(TypedDict):
     extraction_errors: Annotated[list[str], operator.add]
     verified_facts: dict[str, VerifiedFact]
     rejected_facts: list[dict]
+    business_analysis: dict[str, Any]
     final_output: dict
     sources_used: list[str]
     node_timings: dict[str, float]

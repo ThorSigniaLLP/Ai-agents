@@ -18,26 +18,38 @@ from dotenv import load_dotenv
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s — %(message)s")
 
-def test_sync(company: str = "Salesforce"):
+def test_sync(company: str = "Salesforce", website: str = "", email: str = "", address: str = ""):
     """Test the full pipeline synchronously."""
     from graph.research_graph import run_research_sync
 
     print(f"\n{'='*60}")
     print(f"Researching: {company}")
+    if website:
+        print(f"Website:     {website}")
+    if email:
+        print(f"Email:       {email}")
+    if address:
+        print(f"Address:     {address}")
     print(f"{'='*60}\n")
 
     card_info = {
         "company": company,
-        "name": "John Smith",
-        "job_title": "VP of Sales",
-        "email": "john@example.com",
-        "website": "",
+        "name": "",
+        "job_title": "",
+        "email": email,
+        "website": website,
+        "address": address,
     }
 
     result = run_research_sync(company, card_info)
 
     print("\nRESEARCH RESULT:")
-    print(json.dumps(result, indent=2, default=str))
+    result_json = json.dumps(result, indent=2, default=str)
+    print(result_json)
+    
+    with open("report.json", "w", encoding="utf-8") as f:
+        f.write(result_json)
+    print("\n[+] Full report saved to report.json in the current directory!")
 
     expected = {
         "company_name", "website", "linkedin_company_page", "headquarters",
@@ -84,10 +96,17 @@ def test_planner_only(company: str = "Salesforce"):
 
 
 if __name__ == "__main__":
-    company = sys.argv[1] if len(sys.argv) > 1 else "Salesforce"
-    mode = sys.argv[2] if len(sys.argv) > 2 else "full"
+    import argparse
+    parser = argparse.ArgumentParser(description="Test the research pipeline")
+    parser.add_argument("company", nargs="?", default="Salesforce", help="Company name to research")
+    parser.add_argument("--website", "-w", default="", help="Known company website (e.g. gvhcol.com)")
+    parser.add_argument("--email", "-e", default="", help="Contact email (used to derive domain)")
+    parser.add_argument("--address", "-a", default="", help="Company address")
+    parser.add_argument("--mode", "-m", default="full", choices=["full", "planner"], help="Test mode")
+    args = parser.parse_args()
 
-    if mode == "planner":
-        test_planner_only(company)
+    if args.mode == "planner":
+        test_planner_only(args.company)
     else:
-        test_sync(company)
+        test_sync(args.company, website=args.website, email=args.email, address=args.address)
+

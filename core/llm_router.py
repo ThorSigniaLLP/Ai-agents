@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from litellm import completion as litellm_completion
+from litellm import acompletion as litellm_acompletion
 
 from core.config import Settings, get_settings
 
@@ -75,3 +76,48 @@ def completion_with_fallback(
             )
 
     raise RuntimeError("All extraction providers failed (" + ", ".join(failures) + ")")
+
+
+async def acompletion_with_fallback(
+    *,
+    messages: list[dict[str, str]],
+    settings: Settings | None = None,
+    timeout: int = 45,
+    max_tokens: int = 800,
+    response_format: dict[str, Any] | None = None,
+    temperature: float = 0.0,
+) -> tuple[Any, ModelTarget]:
+    """Async: Try Cerebras, Mistral, Gemini, Groq, then OpenRouter without failing on one provider outage."""
+    settings = settings or get_settings()
+    targets = extraction_targets(settings)
+    if not targets:
+        raise RuntimeError("No extraction provider API key is configured")
+
+    failures = []
+    for target in targets:
+        kwargs: dict[str, Any] = {
+            "model": target.model,
+            "api_key": target.api_key,
+            "messages": messages,
+            "temperature": temperature,
+            "timeout": timeout,
+            "max_tokens": max_tokens,
+            "num_retries": 1,
+        }
+        if response_format:
+            kwargs["response_format"] = response_format
+        if target.provider == "gemini":
+            kwargs["reasoning_effort"] = "none"
+        try:
+            response = await litellm_acompletion(**kwargs)
+            logger.info("[LLMRouter] async %s succeeded with %s", target.provider, target.model)
+            return response, target
+        except Exception as exc:
+            failures.append(f"{target.provider}: {type(exc).__name__}")
+            logger.warning(
+                "[LLMRouter] async %s failed with %s; trying next provider",
+                target.provider,
+                type(exc).__name__,
+            )
+
+    raise RuntimeError("All async extraction providers failed (" + ", ".join(failures) + ")")

@@ -284,12 +284,45 @@ def run_smart_fetcher(state: ResearchState) -> dict[str, Any]:
     # Inject priority source URLs (G2, Glassdoor, Crunchbase, Reddit)
     existing_urls = {c["url"] for c in url_candidates}
     priority_urls = _inject_priority_urls(company, existing_urls)
-    # Prepend priority URLs so they are fetched first
-    all_candidates = priority_urls + url_candidates
+
+    # ── Pin the EXACT company website from card_info as the FIRST URL fetched ──
+    # This prevents domain confusion (e.g. "green view medical" → gvhcol.com)
+    card = state.get("card_info", {}) or {}
+    pinned_website = company_website or card.get("website", "")
+    card_email = card.get("email", "")
+    card_email_domain = card_email.split("@")[-1] if "@" in card_email else ""
+    pinned_urls: list[URLCandidate] = []
+    
+    if pinned_website:
+        # Clean and normalize to https:// scheme
+        if not pinned_website.startswith("http"):
+            pinned_website = f"https://{pinned_website}"
+        domain = urlparse(pinned_website).netloc.replace("www.", "")
+        if domain:  # Valid domain extracted
+            for path in ["/", "/about", "/services", "/about-us", "/contact"]:
+                url = f"https://{domain}{path}"
+                if url not in existing_urls:
+                    pinned_urls.append(URLCandidate(
+                        url=url,
+                        domain=domain,
+                        title=f"{company} — {path.strip('/') or 'home'}",
+                        snippet="",
+                        provider="card_info_pin",
+                        rank=0,
+                        domain_score=1.0,
+                        authority_score=1.0,
+                        source_category="OFFICIAL_WEBSITE",
+                        page_type="HOME" if path == "/" else "ABOUT",
+                        page_authority_score=1.0,
+                    ))
+            logger.info("[SmartFetcher] Pinned %d URLs from known domain: %s", len(pinned_urls), domain)
+    
+    # Prepend: pinned website first, then other priority URLs, then search candidates
+    all_candidates = pinned_urls + priority_urls + url_candidates
 
     # Fetch top 30 URLs per iteration
     urls_to_fetch = all_candidates[:30]
-    logger.info(f"[SmartFetcher] Fetching {len(urls_to_fetch)} URLs for {company} ({len(priority_urls)} priority injected)")
+    logger.info(f"[SmartFetcher] Fetching {len(urls_to_fetch)} URLs for {company} ({len(pinned_urls)} pinned, {len(priority_urls)} priority injected)")
 
     async def _run():
         tasks = [_fetch_single_page(url_obj, settings.page_load_timeout, company_website) for url_obj in urls_to_fetch]

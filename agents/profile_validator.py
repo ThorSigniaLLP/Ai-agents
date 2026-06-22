@@ -104,33 +104,40 @@ def run_profile_validator(state: ResearchState) -> dict[str, Any]:
         grouped[item["field"]].append(item)
 
     candidate_urls = state.get("url_candidates", [])
-    website = seed.get("website") or UNKNOWN
+    card = state.get("card_info", {}) or {}
+
+    # Website: prefer card_info.website (already verified), fall back to seed, never erase it
+    card_website = card.get("website", "")
+    if card_website and not card_website.startswith("http"):
+        card_website = f"https://{card_website}"
+    website = card_website or seed.get("website") or UNKNOWN
+
+    # LinkedIn: keep if it looks valid
     linkedin = seed.get("linkedin_company_page") or UNKNOWN
-    if website != UNKNOWN and not any(c.get("source_category") == "OFFICIAL_WEBSITE" for c in candidate_urls):
-        website = UNKNOWN
-    if linkedin != UNKNOWN and not any(c.get("url") == linkedin and c.get("source_category") == "LINKEDIN_COMPANY_PAGE" for c in candidate_urls):
+    if linkedin != UNKNOWN and "linkedin.com/company/" not in linkedin.lower():
         linkedin = UNKNOWN
 
-    # ── Identity fields (strict validation) ───────────────────────────────────
+    # ── Identity fields (relaxed validation) ─────────────────────────────────
     profile: dict[str, Any] = {
         "company_name": state["company"],
         "website": website,
         "linkedin_company_page": linkedin,
-        "headquarters": _scalar(grouped["headquarters"], min_sources=1, min_confidence=0.4),
-        "industry": _scalar(grouped["industry"], min_sources=1, min_confidence=0.4),
-        "founders": _list_values(grouped["founders"], {"ABOUT", "TEAM", "MCA", "ZAUBACORP", "TOFLER", "CRUNCHBASE"}, min_score=0.3),
-        "services": _list_values(grouped["services"], {"HOME", "ABOUT", "SERVICES", "SOLUTIONS", "CASE_STUDIES"}, min_score=0.3),
-        "technologies": _list_values(grouped["technologies"], {"TECH_STACK"}, min_score=0.2),
-        "employee_count": _scalar(grouped["employee_count"], min_sources=1, min_confidence=0.3),
-        "legal_entity": _scalar(grouped["legal_entity"], min_sources=1, min_confidence=0.4),
+        "headquarters": _scalar(grouped["headquarters"], min_sources=1, min_confidence=0.15),
+        "industry": _scalar(grouped["industry"], min_sources=1, min_confidence=0.15),
+        "overview": _scalar(grouped["overview"], min_sources=1, min_confidence=0.15),
+        "founders": _list_values(grouped["founders"], min_score=0.1),
+        "services": _list_values(grouped["services"], min_score=0.1),
+        "technologies": _list_values(grouped["technologies"], min_score=0.1),
+        "employee_count": _scalar(grouped["employee_count"], min_sources=1, min_confidence=0.15),
+        "legal_entity": _scalar(grouped["legal_entity"], min_sources=1, min_confidence=0.15),
     }
 
     # ── Extended B2B intelligence fields (relaxed validation) ─────────────────
 
     # Firmographics
-    profile["founded_year"] = _scalar(grouped["founded_year"], min_sources=1, min_confidence=0.2)
-    profile["revenue"] = _scalar(grouped["revenue"], min_sources=1, min_confidence=0.2)
-    profile["competitors"] = _list_values(grouped["competitors"], min_score=0.2)
+    profile["founded_year"] = _scalar(grouped["founded_year"], min_sources=1, min_confidence=0.1)
+    profile["revenue"] = _scalar(grouped["revenue"], min_sources=1, min_confidence=0.1)
+    profile["competitors"] = _list_values(grouped["competitors"], min_score=0.1)
 
     # Pain points — collect as structured dicts
     pain_points = _collect_json_list(grouped["pain_points"], "pain_points")

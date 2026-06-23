@@ -24,8 +24,8 @@ def extraction_targets(settings: Settings | None = None) -> list[ModelTarget]:
     """Return configured models in primary-to-fallback order."""
     settings = settings or get_settings()
     candidates = [
+        ModelTarget("mistral", settings.primary_model, settings.mistral_api_key),
         ModelTarget("cerebras", settings.fast_model, settings.cerebras_api_key),
-        ModelTarget("mistral", settings.mistral_fallback_model, settings.mistral_api_key),
         ModelTarget("gemini", settings.gemini_fallback_model, settings.gemini_api_key),
         ModelTarget("groq", settings.groq_fallback_model, settings.groq_api_key),
         ModelTarget("openrouter", settings.openrouter_fallback_model, settings.openrouter_api_key),

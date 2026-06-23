@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     )
 
     # ── LLM API Keys ──────────────────────────────────────────────────────────
+    amazon_bedrock: str = ""
     gemini_api_key: str = ""
     groq_api_key: str = ""
     openrouter_api_key: str = ""
@@ -40,9 +41,9 @@ class Settings(BaseSettings):
     browser_headless: bool = True
 
     # ── Model Config ──────────────────────────────────────────────────────────
-    primary_model: str = "cerebras/gpt-oss-120b"
-    extraction_model: str = "cerebras/gpt-oss-120b"
-    fast_model: str = "cerebras/gpt-oss-120b"
+    primary_model: str = "mistral/mistral-large-latest"
+    extraction_model: str = "mistral/mistral-large-latest"
+    fast_model: str = "mistral/mistral-large-latest"
     mistral_fallback_model: str = "mistral/mistral-large-latest"
     gemini_fallback_model: str = "gemini/gemini-2.5-flash"
     groq_fallback_model: str = "groq/llama-3.1-8b-instant"

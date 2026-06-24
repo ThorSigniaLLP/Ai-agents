@@ -47,6 +47,23 @@ _CROSS_ENCODER = None
 _CROSS_ENCODER_FAILED = False
 
 
+def preload_reranker() -> bool:
+    """Pre-load the CrossEncoder model at server startup so the first request isn't slow.
+    Returns True if model loaded successfully, False if it should use LLM fallback."""
+    global _CROSS_ENCODER, _CROSS_ENCODER_FAILED
+    if _CROSS_ENCODER_FAILED or _CROSS_ENCODER is not None:
+        return _CROSS_ENCODER is not None
+    try:
+        from sentence_transformers import CrossEncoder
+        _CROSS_ENCODER = CrossEncoder("BAAI/bge-reranker-v2-m3")
+        logger.info("[Reranker] CrossEncoder model pre-loaded and ready (BAAI/bge-reranker-v2-m3)")
+        return True
+    except Exception as e:
+        _CROSS_ENCODER_FAILED = True
+        logger.warning(f"[Reranker] CrossEncoder pre-load failed — will use LLM batch reranker: {e}")
+        return False
+
+
 def _cross_encoder_rerank(chunks: list[EvidenceChunk], company: str) -> list[float] | None:
     """Use BAAI/bge-reranker-v2-m3 when sentence-transformers is installed."""
     global _CROSS_ENCODER, _CROSS_ENCODER_FAILED

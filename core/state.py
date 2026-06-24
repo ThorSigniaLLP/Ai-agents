@@ -6,6 +6,21 @@ from typing import Annotated, Any, Optional
 from typing_extensions import NotRequired, TypedDict
 
 
+def _merge_dicts(a: dict, b: dict) -> dict:
+    """Merge two dicts — used as reducer for node_timings in parallel branches."""
+    return {**a, **b}
+
+
+def _last_value(a: Any, b: Any) -> Any:
+    """Keep the last-written value — used for 'status' written by parallel branches."""
+    return b
+
+
+def _max_value(a: int | float, b: int | float) -> int | float:
+    """Keep the higher value — used for 'progress_pct' written by parallel branches."""
+    return max(a, b)
+
+
 class URLCandidate(TypedDict):
     url: str
     domain: str
@@ -118,8 +133,8 @@ class ResearchState(TypedDict):
     business_analysis: dict[str, Any]
     final_output: dict
     sources_used: list[str]
-    node_timings: dict[str, float]
+    node_timings: Annotated[dict[str, float], _merge_dicts]
     errors: Annotated[list[str], operator.add]
-    status: str
-    progress_pct: int
+    status: Annotated[str, _last_value]
+    progress_pct: Annotated[int, _max_value]
     log: Annotated[list[str], operator.add]

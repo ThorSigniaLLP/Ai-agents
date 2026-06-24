@@ -75,10 +75,10 @@ def run_business_analyst(state: ResearchState) -> dict[str, Any]:
         facts_summary = f"{facts_summary}\n{inferred_lines}"
     chunks = state.get("evidence_chunks", [])
     # Grab the top 15 chunks based on rerank score
-    top_chunks = sorted(chunks, key=lambda c: c.get("rerank_score", 0), reverse=True)[:15]
+    top_chunks = sorted(chunks, key=lambda c: c.get("rerank_score", 0), reverse=True)[:20]
     
     chunks_text = "\n\n".join(
-        f"[Source: {c.get('url', 'UNKNOWN')}]\n{c.get('chunk', '')[:1000]}"
+        f"[Source: {c.get('url', 'UNKNOWN')}]\n{c.get('chunk', '')[:1500]}"
         for c in top_chunks
     )
     if not chunks_text:
@@ -95,7 +95,8 @@ def run_business_analyst(state: ResearchState) -> dict[str, Any]:
             messages=[{"role": "user", "content": prompt}],
             settings=settings,
             temperature=0.1,
-            timeout=60,
+            timeout=90,
+            max_tokens=4000,
         )
         report = response.choices[0].message.content.strip()
         analysis = {"deep_analysis_report": report}

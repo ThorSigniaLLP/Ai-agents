@@ -81,8 +81,12 @@ def build_research_graph(use_memory_checkpointer: bool = True):
     builder.add_edge("smart_fetcher", "content_cleaner")
     builder.add_edge("content_cleaner", "reranker")
     builder.add_edge("reranker", "specialized_extractors")
+
+    # ── Parallel branch: profile_validator + business_analyst run simultaneously ──
     builder.add_edge("specialized_extractors", "profile_validator")
-    builder.add_edge("profile_validator", "business_analyst")
+    builder.add_edge("specialized_extractors", "business_analyst")
+    # Both branches converge at assemble_output (LangGraph waits for both)
+    builder.add_edge("profile_validator", "assemble_output")
     builder.add_edge("business_analyst", "assemble_output")
     builder.add_edge("assemble_output", END)
 

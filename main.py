@@ -87,6 +87,19 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"❌ Failed to compile research graph: {e}")
 
+    # Pre-load CrossEncoder reranker model (avoids cold-start delay on first request)
+    try:
+        from agents.reranker import preload_reranker
+        import asyncio
+        loop = asyncio.get_event_loop()
+        ok = await loop.run_in_executor(None, preload_reranker)
+        if ok:
+            logger.info("✅ CrossEncoder reranker model loaded and ready")
+        else:
+            logger.info("ℹ️  CrossEncoder unavailable — LLM batch reranker will be used")
+    except Exception as e:
+        logger.warning(f"⚠️  Reranker preload skipped: {e}")
+
     # Init database for FastAPI Admin
     await init_db()
     

@@ -25,11 +25,38 @@ from api.schemas import (
 )
 from core.state import ResearchState
 
+import json
+import os
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# In-memory job store (replace with Redis/DB for production)
-_jobs: dict[str, dict] = {}
+# ── Persistent job store ──────────────────────────────────────────────────────
+_JOBS_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "jobs_state.json")
+
+
+def _load_jobs() -> dict:
+    """Load persisted jobs from disk on startup."""
+    if os.path.exists(_JOBS_FILE):
+        try:
+            with open(_JOBS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            logger.warning(f"[Routes] Could not load jobs_state.json: {e}")
+    return {}
+
+
+def _save_jobs():
+    """Persist current jobs dict to disk."""
+    try:
+        with open(_JOBS_FILE, "w", encoding="utf-8") as f:
+            json.dump(_jobs, f, default=str)
+    except Exception as e:
+        logger.warning(f"[Routes] Could not save jobs_state.json: {e}")
+
+
+# In-memory job store — loaded from disk on startup, saved after every update
+_jobs: dict[str, dict] = _load_jobs()
 
 
 # ── Background task ───────────────────────────────────────────────────────────
@@ -39,6 +66,7 @@ def _run_research_job(job_id: str, company: str, card_info: dict):
     try:
         _jobs[job_id]["status"] = "running"
         _jobs[job_id]["progress_pct"] = 5
+        _save_jobs()
 
         from graph.research_graph import get_graph
         from core.state import ResearchState
@@ -69,11 +97,13 @@ def _run_research_job(job_id: str, company: str, card_info: dict):
         _jobs[job_id]["status"] = "completed"
         _jobs[job_id]["progress_pct"] = 100
         _jobs[job_id]["result"] = final_output
+        _save_jobs()  # Persist completed result to disk
 
     except Exception as e:
         logger.error(f"[Routes] Research job {job_id} failed: {e}", exc_info=True)
         _jobs[job_id]["status"] = "failed"
         _jobs[job_id]["error"] = str(e)
+        _save_jobs()  # Persist failure to disk
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
